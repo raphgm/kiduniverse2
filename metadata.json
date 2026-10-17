@@ -1,0 +1,6 @@
+{
+  "name": "Kiddopia Cloud Lab - Monolith Auth Extraction",
+  "description": "Interactive children's learning platform paired with an Azure architecture lab simulator demonstrating monolithic service extraction, Azure APIM canary routing, and AKS microservice auth.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
