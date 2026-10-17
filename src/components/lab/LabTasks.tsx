@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LabTask } from '../../types';
 import { ArchitectureState } from '../../services/authSimulator';
-import { CheckCircle2, Circle, ArrowRight, Play, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRight, Play, ExternalLink, Code2, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
 
 interface LabTasksProps {
   tasks: LabTask[];
@@ -10,13 +10,117 @@ interface LabTasksProps {
   onQuickAction: (actionKey: string) => void;
 }
 
+const AZURE_SNIPPETS: Record<string, { title: string; language: string; code: string }> = {
+  'task-1-monolith-audit': {
+    title: 'Monolith HTTP Probe & Session Cookie Audit',
+    language: 'bash',
+    code: `# 1. Baseline Request to Legacy Monolith Auth
+curl -i -X POST https://apim-kiddopia.azure-api.net/api/v1/auth/login/child \\
+  -H "Host: apim-kiddopia.azure-api.net" \\
+  -H "Content-Type: application/json" \\
+  -d '{"childId":"kid-leo-01"}'
+
+# Response Headers observe stateful cookie:
+# Set-Cookie: session_id=sid_91823; Path=/; HttpOnly; SameSite=Strict
+# X-Monolith-DB-Lock-Latency: 142ms`,
+  },
+  'task-2-deploy-aks': {
+    title: 'AKS SecretProviderClass & PostgreSQL Private Link Manifest',
+    language: 'yaml',
+    code: `apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: azure-kv-csi-auth
+  namespace: kiddopia-core
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useVMManagedIdentity: "true"
+    userAssignedIdentityID: "\${AZURE_MANAGED_IDENTITY_ID}"
+    keyvaultName: "kv-kiddopia-prod"
+    cloudName: "AzurePublicCloud"
+    objects: |
+      array:
+        - objectName: jwt-signing-cert-rs256
+          objectType: key
+        - objectName: postgres-private-link-conn
+          objectType: secret`,
+  },
+  'task-3-apim-canary': {
+    title: 'Azure APIM Inbound Strangler Fig Canary Policy',
+    language: 'xml',
+    code: `<policies>
+  <inbound>
+    <base />
+    <!-- Skill-Sch Strangler Fig: Split 25% traffic to AKS Auth microservice -->
+    <choose>
+      <when condition="@(new Random().Next(100) < 25)">
+        <set-backend-service base-url="https://aks-ingress.skill-sch.internal/auth" />
+        <set-header name="X-APIM-Canary-Target" exists-action="override">
+          <value>aks-auth-service-v2.kiddopia-core</value>
+        </set-header>
+      </when>
+      <otherwise>
+        <set-backend-service base-url="https://monolith-core.skill-sch.internal/api/v1/auth" />
+      </otherwise>
+    </choose>
+  </inbound>
+</policies>`,
+  },
+  'task-4-token-claims': {
+    title: 'Stateless RS256 OIDC Token Structure (Azure Entra ID compatible)',
+    language: 'json',
+    code: `// Decoded RS256 Bearer Token payload issued by AKS
+{
+  "iss": "https://aks-auth.skill-sch.azure/v2",
+  "sub": "kid-leo-01",
+  "aud": "https://api.kiddopia.io/kids",
+  "tenant_id": "azure-sub-skill-sch-kiddopia",
+  "role": "child",
+  "user_name": "Leo",
+  "family_id": "fam-sarah-jenkins",
+  "scope": "read:stories read:math write:doodles write:stars",
+  "auth_provider": "azure_aks_auth_v2",
+  "vault_key_version": "7f91a82d-azure-kv-2026",
+  "exp": 1792248525
+}`,
+  },
+  'task-5-cutover-retire': {
+    title: '100% APIM Cutover & Monolith Auth Retirement Policy',
+    language: 'xml',
+    code: `<!-- 1. Permanent routing to AKS Microservice (100% Cutover) -->
+<set-backend-service base-url="https://aks-ingress.skill-sch.internal/auth" />
+
+<!-- 2. Decommission response on old monolithic endpoint -->
+<inbound>
+  <return-response>
+    <set-status code="410" reason="Monolith Auth Endpoint Permanently Retired" />
+    <set-header name="Content-Type" exists-action="override">
+      <value>application/json</value>
+    </set-header>
+    <set-body>{"error":"Gone","message":"Please migrate to OIDC v2 Bearer token"}</set-body>
+  </return-response>
+</inbound>`,
+  },
+};
+
 export const LabTasks: React.FC<LabTasksProps> = ({
   tasks,
   onToggleTask,
   archState,
   onQuickAction,
 }) => {
+  const [expandedSnippet, setExpandedSnippet] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const completedCount = tasks.filter((t) => t.completed).length;
+
+  const handleCopy = (id: string, code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   return (
     <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 text-white space-y-6">
@@ -61,7 +165,10 @@ export const LabTasks: React.FC<LabTasksProps> = ({
 
       {/* Task List */}
       <div className="space-y-3">
-        {tasks.map((task, index) => {
+        {tasks.map((task) => {
+          const snippet = AZURE_SNIPPETS[task.id];
+          const isSnippetOpen = expandedSnippet === task.id;
+
           return (
             <div
               key={task.id}
@@ -104,7 +211,19 @@ export const LabTasks: React.FC<LabTasksProps> = ({
                 </div>
 
                 {/* Quick Simulation Action for the student */}
-                <div className="shrink-0">
+                <div className="shrink-0 flex items-center gap-2">
+                  {snippet && (
+                    <button
+                      onClick={() => setExpandedSnippet(isSnippetOpen ? null : task.id)}
+                      className="p-1.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 text-xs font-mono transition-colors cursor-pointer flex items-center gap-1"
+                      title="Toggle Azure Code Snippet"
+                    >
+                      <Code2 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline text-[11px]">Azure Config</span>
+                      {isSnippetOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                    </button>
+                  )}
+
                   {task.id === 'task-2-deploy-aks' && !task.completed && (
                     <button
                       onClick={() => {
@@ -145,6 +264,34 @@ export const LabTasks: React.FC<LabTasksProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Expandable Azure Code Snippet */}
+              {isSnippetOpen && snippet && (
+                <div className="mt-3 pt-3 border-t border-slate-700/80 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
+                    <span className="text-sky-300 font-semibold">{snippet.title}</span>
+                    <button
+                      onClick={() => handleCopy(task.id, snippet.code)}
+                      className="flex items-center gap-1 text-slate-400 hover:text-white cursor-pointer transition-colors"
+                    >
+                      {copiedId === task.id ? (
+                        <>
+                          <Check className="w-3 h-3 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-[11px] font-mono text-slate-300 overflow-x-auto leading-relaxed">
+                    {snippet.code}
+                  </pre>
+                </div>
+              )}
             </div>
           );
         })}
