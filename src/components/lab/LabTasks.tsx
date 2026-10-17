@@ -224,6 +224,19 @@ export const LabTasks: React.FC<LabTasksProps> = ({
                     </button>
                   )}
 
+                  {task.id === 'task-1-monolith-audit' && !task.completed && (
+                    <button
+                      onClick={() => {
+                        onQuickAction('audit-monolith');
+                        onToggleTask(task.id);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Play className="w-3 h-3" />
+                      <span>Audit Probe</span>
+                    </button>
+                  )}
+
                   {task.id === 'task-2-deploy-aks' && !task.completed && (
                     <button
                       onClick={() => {
@@ -247,6 +260,19 @@ export const LabTasks: React.FC<LabTasksProps> = ({
                     >
                       <Play className="w-3 h-3" />
                       <span>Set Canary 25%</span>
+                    </button>
+                  )}
+
+                  {task.id === 'task-4-token-claims' && !task.completed && (
+                    <button
+                      onClick={() => {
+                        onQuickAction('validate-token');
+                        onToggleTask(task.id);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Play className="w-3 h-3" />
+                      <span>Validate Token</span>
                     </button>
                   )}
 

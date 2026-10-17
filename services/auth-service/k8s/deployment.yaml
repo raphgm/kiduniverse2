@@ -1,0 +1,79 @@
+# services/auth-service/k8s/deployment.yaml
+# =============================================================================
+# SKILL.SCH LAB EXERCISE: Monolith Service Extraction - Carving Out Auth
+# STEP 2.7: Deploy Auth Microservice to Azure Kubernetes Service (AKS)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: kiddopia-core
+  labels:
+    app: auth-service
+    tier: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          # TODO [Lab Step 2.7]: Replace with your Azure Container Registry image tag
+          image: ${ACR_NAME:-skill-sch}.azurecr.io/auth-service:v2.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            # TODO [Lab Step 2.7]: Point DB_HOST to your PostgreSQL Private Link FQDN
+            - name: DB_HOST
+              value: "auth-service-psql.privatelink.postgres.database.azure.com"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "authsvc_admin"
+            - name: DB_NAME
+              value: "authdb"
+            - name: FIREBASE_PROJECT_ID
+              value: "enterprise-auth-prod"
+            # Mounted path from CSI driver volume below
+            - name: FIREBASE_SERVICE_ACCOUNT_PATH
+              value: "/mnt/secrets-store/firebase-service-account.json"
+          volumeMounts:
+            # Mount the Azure Key Vault CSI secret volume
+            - name: secrets-store-inline
+              mountPath: "/mnt/secrets-store"
+              readOnly: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        # Volume backed by Secrets Store CSI driver
+        - name: secrets-store-inline
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: "azure-kv-csi-auth"

@@ -267,7 +267,7 @@ export const SKILL_SCH_LAB_TASKS: LabTask[] = [
     title: 'Audit Legacy Monolith Auth Endpoints',
     description: 'Observe how the initial monolithic container handles both children login (`/api/v1/auth/login`) and story catalog requests in a single database session.',
     actionHint: 'Trigger a child sign-in or parent PIN check while in Monolith mode, then inspect the session cookie in Network Wiretap.',
-    completed: true,
+    completed: false,
     verifyEndpoint: '/api/v1/auth/login',
   },
   {

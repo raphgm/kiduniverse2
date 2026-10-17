@@ -108,15 +108,24 @@ export default function App() {
 
   // Quick Action execution from lab task list
   const handleQuickAction = (actionKey: string) => {
-    if (actionKey === 'deploy-aks') {
+    if (actionKey === 'audit-monolith') {
+      authSimulator.setMode('monolith');
+      authSimulator.setCanaryPercent(0);
+      authSimulator.logAppAction('Audit Probe: Monolith Login', '/api/v1/auth/login/child');
+    } else if (actionKey === 'deploy-aks') {
       authSimulator.setMode('extracted');
       authSimulator.setCanaryPercent(10);
+      authSimulator.logAppAction('Provisioned AKS Auth Replica Pool', 'https://aks-ingress.skill-sch.azure/auth/healthz');
     } else if (actionKey === 'set-canary-25') {
       authSimulator.setMode('extracted');
       authSimulator.setCanaryPercent(25);
+      authSimulator.logAppAction('APIM Inbound Canary Policy Applied (25% Shift)', '/apim/policies/canary-traffic');
+    } else if (actionKey === 'validate-token') {
+      authSimulator.logAppAction('Validated RS256 OIDC Token Claims', '/api/v1/auth/verify-token', activeToken.tokenString);
     } else if (actionKey === 'cutover-100') {
       authSimulator.setMode('extracted');
       authSimulator.setCanaryPercent(100);
+      authSimulator.logAppAction('100% Traffic Shift to AKS Auth Microservice', '/api/v1/auth/cutover');
 
       // Unlock Cloud Architect trophy with confetti
       setTrophies((prev) =>
